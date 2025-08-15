@@ -2,7 +2,7 @@
 """
 從 CSV 建立向量索引（支援持久化與 pickle 快取）
 用法：
-  python build_vector_index.py --csv data/output.csv \
+  python csv-utils/build_vector_index.py --csv data/output.csv \
     [--persist data/vector_index] [--pickle data/vector_index.pkl]
 需要：環境變數 OPENAI_API_KEY
 """

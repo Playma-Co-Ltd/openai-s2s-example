@@ -125,7 +125,7 @@
 
 ## 📚 CSV 搜尋路由（Python）
 
-這兩個端點（`/openai-s2s-csv-search`、`/openai-s2s-csv-sks`）會呼叫專案根目錄的 Python 腳本：
+這兩個端點（`/openai-s2s-csv-search`、`/openai-s2s-csv-sks`）會呼叫 `csv-utils/` 目錄下的 Python 腳本：
 - `csv_search_ultra_fast.py`：超快速字串搜尋（標題/摘要/標籤/混合）
 - `csv_search_optimized.py`：字串搜尋 + 可設定內容片段向量搜尋
 - `csv_search_vector_fast.py`：預建向量索引的超快語義搜尋
@@ -148,10 +148,10 @@ pip install -r requirements.txt
 3) 產生向量索引（可選，但能加速語義搜尋）
 ```bash
 # 預設輸出到 data/vector_index.pkl 與 data/vector_index/
-python build_vector_index.py --csv data/output.csv
+python csv-utils/build_vector_index.py --csv data/output.csv
 
 # 自訂路徑
-python build_vector_index.py \
+python csv-utils/build_vector_index.py \
   --csv data/output.csv \
   --persist data/vector_index \
   --pickle data/vector_index.pkl
@@ -172,9 +172,9 @@ python build_vector_index.py \
   - `index.js`：集中註冊所有路由
 - `lib/utils/`
   - `maiagent-chat-client.js`：MaiAgent 封裝（重試/超時/備援）
-- 根目錄 Python 腳本：
-  - `csv_search_ultra_fast.py`、`csv_search_optimized.py`、`csv_search_vector_fast.py`
-  - `build_vector_index.py`
+- Python 腳本（位於 `csv-utils/`）：
+  - `csv-utils/csv_search_ultra_fast.py`、`csv-utils/csv_search_optimized.py`、`csv-utils/csv_search_vector_fast.py`
+- `csv-utils/build_vector_index.py`
 
 ## 🧪 開發與工具
 

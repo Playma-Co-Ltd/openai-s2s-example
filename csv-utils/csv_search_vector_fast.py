@@ -77,7 +77,7 @@ def search_vector_fast(query, max_results=5):
         index = load_index()
         if index is None:
             return {
-                'error': '向量索引未建立，請先執行: python build_vector_index.py',
+                'error': '向量索引未建立，請先執行: python csv-utils/build_vector_index.py',
                 'query': query
             }
         
