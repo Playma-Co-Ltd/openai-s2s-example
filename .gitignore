@@ -81,3 +81,6 @@ ecosystem.config.js
 
 # GitHub pages site
 _site
+
+# Claude Code
+CLAUDE.md
