@@ -1,133 +1,118 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This guide helps Claude Code work effectively with this repository.
 
-## Common Development Commands
+## Common Commands
 
-- **Start the application**: `npm start` or `node app.js`
-- **Lint the code**: `npm run jslint` (runs ESLint with auto-fix)
-- **Restart application**: `npm run restart` (clears OpenAI session cache for voice issues)
-- **Audio testing**: `node audio-test.js` (diagnostic tool for audio issues)
-- **Voice testing**: `node voice-test.js` (test different TTS voices for Chinese)
+- Start app: `npm start` or `node app.js`
+- Lint code: `npm run jslint`
+- Restart (clear caches): `npm run restart`
+- Audio tests (if present): `node audio-test.js`, `node voice-test.js`
 
 ## High-Level Architecture
 
-This is a WebSocket-based application that integrates jambonz telephony platform with multiple speech and AI services to create conversational voice bots. The application supports multiple integration patterns through different route endpoints.
+WebSocket-based app integrating the jambonz telephony platform with OpenAI Realtime and MaiAgent. Routes are event-driven and all endpoints are registered by default.
 
-### Core Components:
+### Core Components
+- `app.js`: creates HTTP/WebSocket server and registers routes
+- `lib/routes/`: integration routes
+  - `openai-s2s.js`: pure OpenAI Realtime
+  - `openai-maiagent-hybrid.js`: OpenAI + MaiAgent hybrid (tool-calling)
+  - `openai-maiagent-hybrid-mini.js`: mini-realtime hybrid
+  - `openai-s2s-csv-search.js`: CSV knowledge assistant with multi-tools
+  - `openai-s2s-csv-sks.js`: CSV knowledge assistant (scripted/marketing tone)
+  - `test-stt.js`: basic STT test endpoint
+  - `index.js`: registers all routes
+- `lib/utils/`
+  - `maiagent-chat-client.js`: MaiAgent client (retries, timeouts, graceful fallback)
+- Python scripts (repo root):
+  - `csv_search_ultra_fast.py`, `csv_search_optimized.py`, `csv_search_vector_fast.py`
+  - `build_vector_index.py`
 
-1. **app.js**: Main entry point that creates HTTP/WebSocket server on port 3000
-   - Uses @jambonz/node-client-ws for WebSocket handling
-   - Integrates pino logger for structured logging
-   - Routes defined in lib/routes/index.js
+## Available Endpoints (All Registered)
 
-2. **lib/routes/**: Route implementations for different integration patterns
-   - **Currently Active**: Multiple routes including `openai-s2s.js`, `openai-maiagent-hybrid.js`, `openai-maiagent-hybrid-mini.js`, and `test-stt.js` (as per lib/routes/index.js)
-   - Multiple available routes supporting different AI/speech combinations
-   - Event-driven architecture with session lifecycle management
+- `GET /openai-s2s`
+  - Model: `gpt-4o-realtime-preview-2025-06-03`
+  - Whisper language: `zh`
+  - Tools: `get_weather`
+  - Persona defined via `instructions`
 
-3. **lib/utils/**: Utility modules for external service integration
-   - `maiagent-chat-client.js`: MaiAgent conversational AI client
-   - `maiagent-azure-token-manager.js`: Azure Speech token management
+- `GET /openai-maiagent-hybrid`
+  - Model: `gpt-4o-realtime-preview-2025-06-03`
+  - Tool-calls `process_user_input` → forwards to MaiAgent
+  - Whisper `zh`
 
-### Available Route Endpoints:
+- `GET /openai-maiagent-hybrid-mini`
+  - Model: `gpt-4o-mini-realtime-preview-2024-12-17`
 
-The application includes multiple route implementations (found in lib/routes/):
-- **`/openai-s2s`** - Full OpenAI Realtime API implementation
-- **`/openai-s2s-csv`** - OpenAI Realtime API with LlamaIndex CSV search integration
-- **`/openai-s2s-csv-fast`** - Optimized multi-tool CSV search with performance improvements
-- **`/openai-maiagent-hybrid`** - OpenAI Realtime + MaiAgent hybrid
-- **`/openai-maiagent-hybrid-mini`** - Lightweight hybrid version  
-- **`/test-stt`** - STT testing endpoint
-- `/azure-speech-s2s` - Azure Speech + MaiAgent
-- `/maiagent-simple` - Simple MaiAgent integration
-- `/openai-maiagent-s2s` - OpenAI STT/TTS + MaiAgent AI
-- `/openai-maiagent-transcribe` - Transcription-focused integration
-- `/simple-transcribe` - Basic transcription endpoint
-- `/openai-maiagent-s2s-v2` - Enhanced version of hybrid approach
-- `/test-gather` - Testing endpoint for gather functionality
-- `/test-gather-http` - HTTP version of gather testing
-- `/gather-webhook` - Webhook for gather operations
-- `/hybrid-realtime` - Alternative hybrid implementation
-- `/maiagent-llm-simple` - Simple MaiAgent LLM integration
-- `/maiagent-llm-s2s` - MaiAgent LLM with speech-to-speech
-- `/openai-maiagent-listen` - Listen-only mode
+- `GET /openai-s2s-csv-search`
+  - Tech news/info assistant with multi-search tools (title/summary/tags/hybrid/content/vector)
+  - Model: `gpt-4o-mini-realtime-preview-2024-12-17`
+  - Requires Python venv + `requirements.txt` + `data/output.csv` (+ optional vector index)
 
-**Note**: To activate different routes, modify `lib/routes/index.js` and uncomment the desired route while commenting others.
+- `GET /openai-s2s-csv-sks`
+  - Scripted/marketing assistant using the same CSV toolchain
+  - Model: `gpt-4o-mini-realtime-preview-2024-12-17`
 
-### Current Active Configuration:
+- `GET /test-stt`
+  - Minimal STT flow to debug transcription
 
-The system currently has multiple active routes (uncommented in lib/routes/index.js):
-- `/openai-s2s` - Full OpenAI Realtime API
-- `/openai-s2s-csv` - OpenAI Realtime API with LlamaIndex CSV search capability
-- `/openai-s2s-csv-fast` - Optimized multi-tool CSV search with fast title/summary/tags search and detailed content search
-- `/openai-maiagent-hybrid` - OpenAI + MaiAgent hybrid pattern
-- `/openai-maiagent-hybrid-mini` - Lightweight hybrid version
-- `/test-stt` - STT testing endpoint
+## Environment Variables
 
-### Environment Requirements:
+Create `.env` at project root:
+```
+OPENAI_API_KEY=your_openai_api_key_here
+MAIAGENT_API_KEY=your_maiagent_api_key_here
+MAIAGENT_CHATBOT_ID=optional_chatbot_id
+WS_PORT=3000
+LOGLEVEL=info
+```
 
-- **OPENAI_API_KEY**: Required for OpenAI API access (STT/TTS)
-- **MAIAGENT_API_KEY**: Required for MaiAgent conversational AI and Azure token management
-- **MAIAGENT_CHATBOT_ID**: Optional MaiAgent chatbot ID for streaming responses
-- **AZURE_SPEECH_REGION**: Azure Speech Service region (default: japaneast)
-- **AZURE_TTS_VOICE**: Azure TTS voice selection (default: zh-CN-XiaoxiaoNeural)
-- **AZURE_TTS_SPEAKING_RATE**: Azure TTS speech rate (default: 1.0)
-- **AZURE_TTS_PITCH**: Azure TTS pitch adjustment (default: +0Hz)
-- **WS_PORT**: WebSocket server port (default: 3000)
-- **LOGLEVEL**: Logging level (default: info)
+## CSV Search (Python) Setup
 
-### Key Integration Patterns:
+1) Data files:
+- Required: `data/output.csv`
+- Optional semantic index (either): `data/vector_index.pkl` or `data/vector_index/`
 
-1. **Full OpenAI Realtime** (`/openai-s2s`):
-   - Pure OpenAI Realtime API implementation using GPT-4o Realtime
-   - Lowest latency, fully integrated pipeline
-   - Weather tool function integration
-   - Chinese joke master persona with humor-focused responses
+2) Python venv and deps:
+```
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-2. **OpenAI + LlamaIndex CSV Search** (`/openai-s2s-csv`):
-   - Based on OpenAI Realtime API with GPT-4o Realtime
-   - Integrates LlamaIndex for searching CSV data in `data/output.csv`
-   - Includes `search_csv` tool function for querying tech articles database
-   - Professional tech assistant persona specialized in AI/tech topics
-   - Python backend integration using `csv_search.py` script
+3) Build vector index (optional but recommended for semantic search):
+```
+# default outputs to data/vector_index.pkl and data/vector_index/
+python build_vector_index.py --csv data/output.csv
 
-3. **Optimized Multi-Tool CSV Search** (`/openai-s2s-csv-fast`):
-   - Performance-optimized version with multiple specialized search tools
-   - **Fast Tools** (string-based, ~1 second): `search_titles`, `search_summaries`, `search_tags`
-   - **Detailed Tool** (vector-based, ~3-5 seconds): `search_content`
-   - Smart tool selection strategy - AI uses fast tools first, detailed search only when needed
-   - Uses `csv_search_optimized.py` with indexed caching for better performance
-   - Separate search functions for title_en/cn, summary_en/cn, tags_en/cn, content_en/cn fields
+# custom paths
+python build_vector_index.py \
+  --csv data/output.csv \
+  --persist data/vector_index \
+  --pickle data/vector_index.pkl
+```
 
-4. **OpenAI + MaiAgent Hybrid** (`/openai-maiagent-hybrid`):
-   - OpenAI Realtime API for STT/TTS with GPT-4o Realtime
-   - MaiAgent for conversational AI intelligence
-   - Combines OpenAI voice quality with MaiAgent AI capabilities
-   - Uses event-driven session management
+The Realtime CSV routes invoke these Python scripts via child processes. Ensure `.venv` deps are installed and `OPENAI_API_KEY` is set.
 
-5. **Azure Speech + MaiAgent** (commented routes):
-   - Azure Speech Services for STT/TTS
-   - MaiAgent for AI processing
-   - Requires Azure token management through MaiAgent API
+## Development Workflow
 
-6. **Multiple Testing/Development Routes**:
-   - Various endpoints for testing specific functionality
-   - Transcription-only modes for development
-   - Gather operation testing endpoints
+1. Start app: `npm start`
+2. Expose with ngrok for inbound calls: `ngrok http 3000`
+3. Configure jambonz webhook to desired endpoint, e.g.:
+   - `https://<ngrok-id>.ngrok.io/openai-s2s`
+   - `https://<ngrok-id>.ngrok.io/openai-maiagent-hybrid`
+   - `https://<ngrok-id>.ngrok.io/openai-s2s-csv-search`
+4. Test with a SIP client (e.g., Zoiper)
+5. Monitor logs (structured via `pino`); raise `LOGLEVEL=debug` if needed
 
-### Development Workflow:
+## Code Style (ESLint)
+- 2-space indentation, single quotes, 120 char max line length
+- Promise error handling enforced
+- Structured logging via `pino`
 
-1. Use ngrok for local development: `ngrok http 3000`
-2. Configure jambonz webhook to desired active endpoint
-3. Test with SIP client (e.g., Zoiper)
-4. Monitor logs for real-time debugging
-5. Switch routes by modifying `lib/routes/index.js` as needed
-
-### Code Style:
-
-- ESLint configuration enforces 2-space indentation
-- Single quotes for strings
-- Max line length: 120 characters
-- Promises with error handling enforced
-- Structured logging with pino throughout the application
+## Notes for Changes
+- Keep route registrations in `lib/routes/index.js` in sync with docs
+- When adding new tools to Realtime routes, ensure tool schemas are concise and validated
+- For CSV routes, avoid printing to stderr in Python scripts as outputs are parsed as JSON
+- Prefer shorter `instructions` strings or multiline template literals to satisfy `max-len`

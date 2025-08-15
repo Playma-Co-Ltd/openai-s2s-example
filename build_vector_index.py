@@ -1,181 +1,98 @@
 #!/usr/bin/env python3
 """
-預建向量索引腳本 - 一次性建立所有文檔的向量索引
-只需執行一次，之後搜尋會很快
+從 CSV 建立向量索引（支援持久化與 pickle 快取）
+用法：
+  python build_vector_index.py --csv data/output.csv \
+    [--persist data/vector_index] [--pickle data/vector_index.pkl]
+需要：環境變數 OPENAI_API_KEY
 """
 import os
 import sys
+import argparse
 import pandas as pd
 import pickle
-from llama_index.core import Document, VectorStoreIndex, StorageContext, load_index_from_storage
+from pathlib import Path
+from dotenv import load_dotenv
+from llama_index.core import Document, VectorStoreIndex, StorageContext
+from llama_index.core.settings import Settings
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
-from llama_index.core.settings import Settings
-import time
-from dotenv import load_dotenv
 
-# 載入 .env 檔案
-load_dotenv()
 
 def setup_llama_index():
-    """設置 LlamaIndex"""
+    load_dotenv()
     openai_key = os.getenv('OPENAI_API_KEY')
     if not openai_key:
-        print("錯誤：需要設定 OPENAI_API_KEY 環境變數")
-        sys.exit(1)
-    
-    Settings.llm = OpenAI(model="gpt-4o-mini", api_key=openai_key, temperature=0)
-    Settings.embed_model = OpenAIEmbedding(
-        model="text-embedding-3-small",
-        api_key=openai_key
-    )
-    print("✓ OpenAI 設定完成")
+        raise RuntimeError('OPENAI_API_KEY not set in environment or .env')
+    Settings.llm = OpenAI(model='gpt-4o-mini', api_key=openai_key, temperature=0)
+    Settings.embed_model = OpenAIEmbedding(model='text-embedding-3-small', api_key=openai_key)
 
-def load_csv_and_create_documents():
-    """載入 CSV 並創建文檔"""
-    csv_path = 'data/output.csv'
+
+def load_csv(csv_path: str) -> pd.DataFrame:
     if not os.path.exists(csv_path):
-        print(f"錯誤：找不到 {csv_path}")
-        sys.exit(1)
-    
-    print(f"正在載入 {csv_path}...")
-    df = pd.read_csv(csv_path)
-    print(f"✓ 載入 {len(df)} 筆資料")
-    
-    documents = []
-    for index, row in df.iterrows():
-        # 組合所有重要欄位
-        title_cn = row.get('title_cn', '')
-        title_en = row.get('title_en', '')
-        summary_cn = row.get('summary_cn', '')
-        summary_en = row.get('summary_en', '')
-        tags_cn = row.get('tags_cn', '')
-        tags_en = row.get('tags_en', '')
-        content_cn = str(row.get('content_cn', ''))[:500]  # 限制內容長度
-        
-        # 建立完整文本
-        full_text = f"""
-標題: {title_cn}
-Title: {title_en}
-摘要: {summary_cn}
-Summary: {summary_en}
-標籤: {tags_cn}
-Tags: {tags_en}
-內容: {content_cn}
-        """.strip()
-        
-        # 儲存元資料
+        raise FileNotFoundError(f'CSV file not found: {csv_path}')
+    return pd.read_csv(csv_path)
+
+
+def make_documents(df: pd.DataFrame) -> list[Document]:
+    documents: list[Document] = []
+    for idx, row in df.iterrows():
+        title_cn = str(row.get('title_cn', ''))
+        title_en = str(row.get('title_en', ''))
+        summary_cn = str(row.get('summary_cn', ''))
+        summary_en = str(row.get('summary_en', ''))
+        content_cn = str(row.get('content_cn', ''))
+        content_en = str(row.get('content_en', ''))
+        text = f"{title_cn}\n{title_en}\n{summary_cn}\n{summary_en}\n{content_cn}\n{content_en}"
         metadata = {
-            'id': row.get('id', index),
+            'id': int(row['id']) if 'id' in row and pd.notna(row['id']) else idx,
             'title_cn': title_cn,
             'title_en': title_en,
-            'source': row.get('source', ''),
-            'date': row.get('date', ''),
-            'url': row.get('url', ''),
-            'summary_cn': summary_cn[:200] if summary_cn else '',
-            'tags_cn': tags_cn
+            'source': str(row.get('source', '')),
+            'date': str(row.get('date', '')),
+            'url': str(row.get('url', '')),
+            'summary_cn': summary_cn,
+            'summary_en': summary_en,
         }
-        
-        doc = Document(text=full_text, metadata=metadata)
-        documents.append(doc)
-        
-        if (index + 1) % 100 == 0:
-            print(f"  處理進度: {index + 1}/{len(df)}")
-    
-    print(f"✓ 創建 {len(documents)} 個文檔")
+        documents.append(Document(text=text, metadata=metadata))
     return documents
 
-def build_and_save_index(documents):
-    """建立向量索引並儲存"""
-    index_dir = 'data/vector_index'
-    
-    # 建立索引目錄
-    os.makedirs(index_dir, exist_ok=True)
-    
-    print("\n開始建立向量索引（這會花費 1-3 分鐘）...")
-    print("正在呼叫 OpenAI Embedding API...")
-    
-    start_time = time.time()
-    
-    # 建立向量索引
-    index = VectorStoreIndex.from_documents(
-        documents,
-        show_progress=True  # 顯示進度條
-    )
-    
-    elapsed = time.time() - start_time
-    print(f"✓ 向量索引建立完成！耗時: {elapsed:.1f} 秒")
-    
-    # 儲存索引到磁碟
-    print(f"\n正在儲存索引到 {index_dir}...")
-    index.storage_context.persist(persist_dir=index_dir)
-    print(f"✓ 索引已儲存")
-    
-    # 也儲存一份 pickle 版本以便快速載入
-    pickle_path = 'data/vector_index.pkl'
+
+def build_index(documents: list[Document]) -> VectorStoreIndex:
+    return VectorStoreIndex.from_documents(documents)
+
+
+def persist_index(index: VectorStoreIndex, persist_dir: str):
+    Path(persist_dir).mkdir(parents=True, exist_ok=True)
+    index.storage_context.persist(persist_dir=persist_dir)
+
+
+def dump_pickle(index: VectorStoreIndex, pickle_path: str):
+    Path(os.path.dirname(pickle_path) or '.').mkdir(parents=True, exist_ok=True)
     with open(pickle_path, 'wb') as f:
         pickle.dump(index, f)
-    print(f"✓ Pickle 版本已儲存到 {pickle_path}")
-    
-    return index
 
-def test_index(index):
-    """測試索引搜尋功能"""
-    print("\n=== 測試搜尋功能 ===")
-    
-    test_queries = [
-        "AI 人工智慧",
-        "語音辨識",
-        "最新科技新聞",
-        "Anthropic Claude"
-    ]
-    
-    for query in test_queries:
-        print(f"\n搜尋: '{query}'")
-        start = time.time()
-        
-        query_engine = index.as_query_engine(
-            similarity_top_k=3,
-            response_mode="no_text"  # 只返回文檔，不生成摘要
-        )
-        
-        response = query_engine.query(query)
-        
-        print(f"  耗時: {(time.time() - start)*1000:.0f}ms")
-        print(f"  找到 {len(response.source_nodes)} 個相關文檔:")
-        
-        for node in response.source_nodes[:2]:
-            metadata = node.metadata
-            print(f"    - {metadata.get('title_cn', 'N/A')} (相關度: {node.score:.3f})")
 
 def main():
-    print("=== 向量索引預建腳本 ===")
-    print("此腳本只需執行一次，建立的索引可重複使用\n")
-    
-    # 檢查是否已有索引
-    if os.path.exists('data/vector_index.pkl'):
-        response = input("發現已存在的索引，是否重建？(y/n): ")
-        if response.lower() != 'y':
-            print("取消操作")
-            return
-    
-    # 設置 OpenAI
-    setup_llama_index()
-    
-    # 載入資料並創建文檔
-    documents = load_csv_and_create_documents()
-    
-    # 建立並儲存索引
-    index = build_and_save_index(documents)
-    
-    # 測試索引
-    test_index(index)
-    
-    print("\n=== 完成！===")
-    print("索引已建立並儲存。現在搜尋將會快很多！")
-    print("檔案位置:")
-    print("  - data/vector_index/ (LlamaIndex 格式)")
-    print("  - data/vector_index.pkl (Pickle 格式)")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--csv', required=True, help='Path to CSV, e.g., data/output.csv')
+    parser.add_argument('--persist', default='data/vector_index', help='Persist dir for LlamaIndex storage')
+    parser.add_argument('--pickle', dest='pickle_path', default='data/vector_index.pkl', help='Pickle path for fast load')
+    args = parser.parse_args()
 
-if __name__ == "__main__":
-    main()
+    setup_llama_index()
+    df = load_csv(args.csv)
+    documents = make_documents(df)
+    index = build_index(documents)
+
+    # 同時輸出兩種格式
+    persist_index(index, args.persist)
+    dump_pickle(index, args.pickle_path)
+
+    print('Index built successfully:')
+    print(f'  Persist dir: {args.persist}')
+    print(f'  Pickle file: {args.pickle_path}')
+
+
+if __name__ == '__main__':
+    main() 

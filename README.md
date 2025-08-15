@@ -1,401 +1,216 @@
-# 🎭 OpenAI 中文笑話大師 (Chinese Joke Master)
+# 🎙️ AI 語音助理
 
-一個基於 OpenAI Realtime API 和 jambonz 的智能中文語音笑話機器人，能夠進行實時中文語音對話並提供各種有趣的笑話和幽默內容。
+基於 WebSocket 的語音助理應用程式，整合 jambonz 電話平台與多種語音與 AI 服務，打造可擴展的即時語音機器人。支援多種整合模式（OpenAI Realtime、MaiAgent 混合、CSV 知識搜尋等），所有端點已預設註冊，可直接測試。
 
-## ✨ 功能特點
+## ✨ 功能特色
 
-### 🎤 實時語音對話
-- **語音識別**: 使用 OpenAI Whisper-1 模型進行實時語音轉文字
-- **智能回應**: 基於 GPT-4o Realtime 模型的自然對話
-- **語音合成**: OpenAI TTS (Shimmer 聲音) 提供自然的中文語音輸出
-- **打斷功能**: 支持在 AI 說話時進行打斷對話
+### 🎤 即時語音
+- **語音識別**: OpenAI Whisper（中文）
+- **語音合成**: OpenAI TTS（預設 `shimmer`，輸出 `pcm16`）
+- **低延遲**: 使用 Realtime API 與伺服端事件驅動
 
-### 😄 笑話大師功能
-- **多種笑話類型**: 冷笑話、雙關語、一句話笑話、敲門笑話
-- **互動娛樂**: 根據用戶需求提供不同類型的幽默內容
-- **中文專精**: 確保所有回應都使用中文，避免語言混淆
-- **個性化體驗**: 友好幽默的 AI 人格設定
+### 🤖 整合模式
+- **OpenAI Realtime**（純 OpenAI）
+- **OpenAI + MaiAgent 混合**（由工具調用串接 MaiAgent）
+- **CSV 知識搜尋**（多工具/向量索引/超快字串匹配）
 
-### 🛠 額外功能
-- **天氣查詢**: 內建天氣查詢工具 (使用 Open-Meteo API)
-- **實時事件監聽**: 完整的對話事件追蹤和日誌記錄
-- **音頻測試**: 內建音頻診斷工具
+### 🛠 開發者體驗
+- **事件驅動架構**: 完整會話生命週期與事件鉤子
+- **結構化日誌**: `pino`
+- **ESLint** 規範已內建
 
-## 🚀 快速開始
+## 🚦 可用端點（皆已預設啟用）
 
-### 前置需求
-- **Node.js** 18+ 
-- **jambonz 伺服器** (版本 0.9.2-rc3 或更高)
-- **OpenAI API Key** (需要 Realtime API 存取權限)
-- **ngrok** (用於本地開發和測試)
-- **Zoiper** 或其他 SIP 客戶端 (用於模擬電話測試)
+見 `lib/routes/index.js`：所有路由皆已 `require(...)` 註冊，不需切換即可呼叫。
 
-### 安裝步驟
+- `GET /openai-s2s`
+  - 純 OpenAI Realtime 模式
+  - 模型: `gpt-4o-realtime-preview-2025-06-03`
+  - Whisper 語言: `zh`
+  - 內建工具: `get_weather`
+  - 風格: 搞笑助理（可於程式內調整 `instructions`）
 
-1. **克隆專案**
-   ```bash
-   git clone <repository-url>
-   cd openai-s2s-example
-   ```
+- `GET /openai-maiagent-hybrid`
+  - OpenAI Realtime + MaiAgent 混合
+  - 模型: `gpt-4o-realtime-preview-2025-06-03`
+  - 透過工具 `process_user_input` 將用戶話語交給 MaiAgent 回答
+  - Whisper 語言: `zh`
 
-2. **安裝依賴**
+- `GET /openai-maiagent-hybrid-mini`
+  - 輕量混合版
+  - 模型: `gpt-4o-mini-realtime-preview-2024-12-17`
+
+- `GET /openai-s2s-csv-search`
+  - 科技資訊助理 + 多種搜尋工具（標題/摘要/標籤/混合/內容/向量）
+  - 模型: `gpt-4o-mini-realtime-preview-2024-12-17`
+  - 需求: Python 虛擬環境、`requirements.txt`、`data/output.csv` 與（可選）向量索引
+
+- `GET /openai-s2s-csv-sks`
+  - 指定話術版本（例如外撥行銷腳本）+ 同樣的 CSV 搜尋工具鏈
+  - 模型: `gpt-4o-mini-realtime-preview-2024-12-17`
+
+- `GET /test-stt`
+  - 基礎 STT 測試（只做識別與回覆）
+
+## 🧩 環境需求
+
+- Node.js 18+
+- jambonz 0.9.2-rc3 以上
+- OpenAI API Key（需 Realtime 存取）
+- MaiAgent API Key（選擇使用混合模式時）
+- Python 3.10+（CSV 搜尋路由所需）
+
+## ⚙️ 安裝與啟動
+
+1) 安裝 Node 依賴
    ```bash
    npm install
    ```
 
-3. **環境設定**
-   ```bash
-   cp .env.example .env
-   # 編輯 .env 文件，設定您的 OpenAI API Key
-   ```
-
-4. **設定環境變數**
-   在 `.env` 文件中設定：
+2) 設定環境變數（在專案根目錄建立 `.env`）
    ```env
    OPENAI_API_KEY=your_openai_api_key_here
-   LOGLEVEL=info
+   MAIAGENT_API_KEY=your_maiagent_api_key_here
+   MAIAGENT_CHATBOT_ID=optional_chatbot_id
    WS_PORT=3000
+   LOGLEVEL=info
    ```
 
-5. **啟動應用程式**
+3) 啟動伺服器
    ```bash
    npm start
    # 或
    node app.js
    ```
 
-> **💡 聲音提示**: 如果發現 shimmer 聲音在第一通電話後有口音，請使用 `npm run restart` 清除快取。
-
-### ngrok 設定 (本地開發)
-
-1. **安裝 ngrok**
-   ```bash
-   # macOS
-   brew install ngrok
-   
-   # 或下載自 https://ngrok.com/
-   ```
-
-2. **啟動 ngrok 隧道**
+4) ngrok（本地）
    ```bash
    ngrok http 3000
    ```
 
-3. **獲取公網 URL**
-   ngrok 會提供類似的 URL：
-   ```
-   https://abcd1234.ngrok.io
-   ```
+5) jambonz 設定
+- 登入 jambonz 控制台
+- 前往 Applications → Add application，設定 Calling webhook URL（以 ngrok 產生的 HTTPS 為前綴），可指向任一端點：
+  ```
+  https://<ngrok-id>.ngrok.io/openai-s2s
+  https://<ngrok-id>.ngrok.io/openai-maiagent-hybrid
+  https://<ngrok-id>.ngrok.io/openai-s2s-csv-search
+  ```
+- 語音服務（Voice / Speech）：
+  - Speech synthesis vendor（TTS）: Whisper
+    - Voice: shimmer（推薦中文）
+  - Speech recognizer vendor（STT）: OpenAI
+    - Language: Chinese（中文）
+- 新增 SIP Client（Clients → Add sip client）：
+  - User Name：自行設定（例如 `100`）
+  - Password：自行設定（例如 `1234`）
+- 新增 Speech Service（Speech → Add speech service）：
+  - Vendor：OpenAI
+  - API KEY：你的 OpenAI API Key
+- 新增 SIP realm（Account → SIP realm）
+  - 輸入自定義的名稱
+- 新增預設 Application（Account → Application for SIP device calls）
+  - 選擇剛才創建的 Application
 
-### jambonz 配置
+### Zoiper 設定（SIP 客戶端測試）
+- 下載並安裝 Zoiper（支援 Windows、macOS、iOS、Android）
+- 新增 SIP 帳號：
+  ```
+  domain: [剛才於 Account 設定的 SIP realm]
+  Username: [剛才於 Clients 建立的使用者名稱]
+  Password: [剛才於 Clients 建立的密碼]
+  ```
+- 確認左側帳號左上角為綠色 ✅（代表已註冊）
+- 撥打測試用分機（例如 `100`）進行通話測試
 
-1. **登入 jambonz 控制台**
-2. **點選 Applications -> Add applications**
-3. **設定 Calling webhook URL** (使用 ngrok URL):
-   ```
-   https://your-ngrok-url.ngrok.io/openai-s2s
-   ```
-4. **設定 Speech synthesis vendor**
-    ```
-    Speech synthesis vendor : Whisper
-    Language : Chinese（中文語音輸出）
-    Voice : Shimmer（推薦中文聲音，也可選 Nova）
-    ```
-5. **設定 Speech recognizer vendor**
-    ```
-    Speech recognizer vendor : OpenAI
-    Language : Chinese（中文語音識別）
-    ```
-   
-6. **點選 clients -> Add sip client**
-    ```
-    User Name : 100（可自訂）
-    Password : 1234（可自訂）
-    ```
-7. **點選 Speech -> Add speech service**
-    ```
-    Vendor : Whisper
-    API KEY : YOUR_OPENAI_API_KEY
-    ```
+## 📚 CSV 搜尋路由（Python）
 
-8. **配置 SIP 端點** 用於測試
+這兩個端點（`/openai-s2s-csv-search`、`/openai-s2s-csv-sks`）會呼叫專案根目錄的 Python 腳本：
+- `csv_search_ultra_fast.py`：超快速字串搜尋（標題/摘要/標籤/混合）
+- `csv_search_optimized.py`：字串搜尋 + 可設定內容片段向量搜尋
+- `csv_search_vector_fast.py`：預建向量索引的超快語義搜尋
 
-### Zoiper 設定 (SIP 客戶端測試)
+### 準備資料與環境
 
-1. **下載安裝 Zoiper**
-   - 官網: https://www.zoiper.com/
-   - 支援 Windows、macOS、iOS、Android
+1) 放置資料檔
+- `data/output.csv`（必要）
+- （可選）向量索引其一：
+  - `data/vector_index.pkl`
+  - `data/vector_index/`（LlamaIndex 持久化）
 
-2. **配置 SIP 帳號**
-   ```
-   domain: [jambonz Account SIP realm(xxxxxxxxx.sip.jambonz.cloud)]
-   Username: [jambonz Client 剛才設定的 User name]
-   Password: [jambonz Client 剛才設定的 Password]
-   ```
-
-3. **測試連接**
-   - 確保 Zoiper Accounts 左邊顯示 "✅"
-   - 撥打 100
-
-## 📞 使用方式
-
-### 與笑話大師對話
-
-使用 Zoiper 撥打您配置的測試號碼，您會聽到：
-
-```
-"你好！我是你的專屬搞笑大師！準備好笑了嗎？
-我有超多搞笑的笑話、雙關語和有趣故事來點亮你的一天！
-你想聽什麼類型的幽默呢？"
+2) 建立 Python 虛擬環境與安裝依賴
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-### 對話範例
+3) 產生向量索引（可選，但能加速語義搜尋）
+```bash
+# 預設輸出到 data/vector_index.pkl 與 data/vector_index/
+python build_vector_index.py --csv data/output.csv
 
-- 🎭 **"講個笑話給我聽"** - 隨機笑話
-- 🌍 **"紐約今天天氣如何？"** - 天氣查詢
-- 😄 **"我想聽冷笑話"** - 特定類型笑話
-- 🎯 **"來點搞笑的"** - 幽默內容
-- 💬 **自然中文對話** - 任何話題都能幽默回應
+# 自訂路徑
+python build_vector_index.py \
+  --csv data/output.csv \
+  --persist data/vector_index \
+  --pickle data/vector_index.pkl
+```
 
-### 測試流程
+> 注意：語義搜尋會使用 `OPENAI_API_KEY`（讀取自 `.env`）。
 
-1. **啟動應用程式**: `node app.js`
-2. **啟動 ngrok**: `ngrok http 3000`
-3. **配置 jambonz**: 使用 ngrok URL
-4. **打開 Zoiper**: 確保 SIP 註冊成功
-5. **撥打測試**: 開始與笑話大師對話！
+## 🏗 專案結構
 
-## 🎵 測試和診斷
+- `app.js`：建立 HTTP/WS 伺服器，掛載所有路由
+- `lib/routes/`：
+  - `openai-s2s.js`：純 OpenAI Realtime（`gpt-4o-realtime-preview-2025-06-03`）
+  - `openai-maiagent-hybrid.js`：OpenAI + MaiAgent 混合
+  - `openai-maiagent-hybrid-mini.js`：使用 mini-realtime 的混合
+  - `openai-s2s-csv-search.js`：CSV 搜尋助理（多工具）
+  - `openai-s2s-csv-sks.js`：CSV 搜尋助理（行銷話術）
+  - `test-stt.js`：基礎 STT 測試
+  - `index.js`：集中註冊所有路由
+- `lib/utils/`
+  - `maiagent-chat-client.js`：MaiAgent 封裝（重試/超時/備援）
+- 根目錄 Python 腳本：
+  - `csv_search_ultra_fast.py`、`csv_search_optimized.py`、`csv_search_vector_fast.py`
+  - `build_vector_index.py`
 
-### 音頻測試程式
+## 🧪 開發與工具
 
-如果遇到音頻問題，可以使用內建的測試程式：
+- Lint：
+```bash
+npm run jslint
+```
 
+- 重啟（清理快取）：
+```bash
+npm run restart
+```
+
+- 音訊/語音測試（若有對應檔案）：
 ```bash
 node audio-test.js
-```
-
-**測試端點**: `https://your-ngrok-url.ngrok.io/audio-test`
-
-**使用方式**:
-1. 啟動測試程式: `node audio-test.js`
-2. 在 jambonz 中暫時將 Webhook 改為測試端點
-3. 用 Zoiper 撥打測試號碼
-4. 聽取測試序列
-
-**測試序列**:
-1. 440Hz 音調 (音頻路徑測試)
-2. 基本 TTS 測試
-3. 800Hz 音調確認  
-4. TTS 完成訊息
-
-### 中文聲音測試程式
-
-如果發現中文有奇怪口音，可以使用聲音測試程式比較不同聲音效果：
-
-```bash
 node voice-test.js
 ```
 
-**測試端點**: `https://your-ngrok-url.ngrok.io/voice-test` (端口 3000)
+## 🩺 疑難排解
 
-**使用方式**:
-1. 關閉主程式 `app.js` (如果正在運行)
-2. 啟動測試程式: `node voice-test.js` (運行在端口 3000)
-3. 啟動 ngrok 指向測試端口: `ngrok http 3000`
-4. 在 jambonz 中暫時將 Webhook 改為新的 ngrok URL + `/voice-test`
-5. 用 Zoiper 撥打測試號碼
-6. 聽取當前聲音的中文測試語音
-7. 掛斷後自動切換到下一個聲音
-8. 重複測試所有8種聲音
+- 無音訊：確認 OpenAI Key、ngrok、jambonz Webhook 設定
+- 連線問題：jambonz 版本、SIP 註冊、伺服端日誌
+- AI 回應：檢查 MaiAgent Key（若用混合）、API 狀態與日誌
+- 提升日誌：`LOGLEVEL=debug`
 
-**測試聲音順序**:
-1. `shimmer` (推薦中文)
-2. `alloy` (原設定)
-3. `echo`
-4. `ash` (新聲音)
-5. `ballad` (新聲音)
-6. `coral` (新聲音)
-7. `sage` (新聲音)
-8. `verse` (新聲音)
+## 📊 成本與監控
 
-### 故障排除
+- Realtime / Whisper / TTS 依 OpenAI 計費
+- 可於 OpenAI 與 MaiAgent 後台監控使用量
 
-#### 沒有聲音
-1. **檢查 OpenAI API Key** - 確保有效且具備 Realtime API 權限
-2. **測試音頻路徑** - 使用 `audio-test.js` 診斷
-3. **檢查 ngrok 連接** - 確認隧道正常運行
-4. **檢查 jambonz 配置** - 確認 Webhook URL 正確
-5. **Zoiper 設定** - 確保 SIP 註冊成功
-6. **網絡問題** - 檢查防火牆和 NAT 設定
-
-#### 語言問題  
-- OpenAI 模型已強化中文回應設定
-- 如果仍有其他語言混入，重啟應用程式
-- 檢查 instructions 設定是否正確
-
-#### 聲音口音問題  
-**症狀**: 第一通電話 shimmer 聲音正常，之後有重口音
-- **原因**: OpenAI Realtime API 會話狀態被快取
-- **快速解決**: 使用重啟腳本清除快取
-  ```bash
-  npm run restart
-  # 或
-  node restart-app.js
-  ```
-- **手動解決**: 停止應用程式 → 等待5秒 → 重新啟動
-
-#### 連接問題
-- 確認 jambonz 版本 >= 0.9.2-rc3
-- 檢查 ngrok 隧道狀態: `curl https://your-ngrok-url.ngrok.io/`
-- 檢查 WebSocket 連接
-- 確認 Zoiper SIP 註冊狀態
-- 查看應用程式日誌輸出
-
-#### ngrok 相關問題
-- **隧道斷開**: 重新啟動 ngrok
-- **URL 變更**: 更新 jambonz 中的 Webhook URL
-- **連接限制**: 免費版 ngrok 有連接數限制
-- **HTTPS 需求**: jambonz 可能需要 HTTPS 端點
-
-## ⚙️ 配置選項
-
-### OpenAI 設定
-
-在 `lib/routes/openai-s2s.js` 中可以調整：
-
-```javascript
-llmOptions: {
-  response_create: {
-    voice: 'shimmer',         // 推薦中文: shimmer, alloy
-    temperature: 0.7,         // 創意程度 (0.0-1.0)
-    max_output_tokens: 4096,  // 最大回應長度
-  }
-}
-```
-
-### 中文聲音選擇
-
-不同聲音對中文的效果：
-- **✅ shimmer** - 推薦中文聲音，自然流暢
-- **✅ alloy** - 原始設定，中文可用
-- **🆕 ash** - 新聲音，需測試中文效果
-- **🆕 ballad** - 新聲音，需測試中文效果
-- **🆕 coral** - 新聲音，需測試中文效果
-- **⚠️ echo** - 英文優化，中文口音較重
-- **🆕 sage** - 新聲音，需測試中文效果
-- **🆕 verse** - 新聲音，需測試中文效果
-
-### 語音設定
-
-```javascript
-turn_detection: {
-  threshold: 0.8,           // 語音檢測靈敏度
-  silence_duration_ms: 500, // 靜音持續時間
-}
-```
-
-## 📁 專案結構
-
-```
-openai-s2s-example/
-├── app.js                 # 主應用程式入口
-├── audio-test.js          # 音頻測試工具
-├── voice-test.js          # 中文聲音測試工具
-├── restart-app.js         # 快速重啟腳本（清除聲音快取）
-├── lib/
-│   └── routes/
-│       ├── index.js       # 路由配置
-│       └── openai-s2s.js  # 核心邏輯（笑話大師）
-├── .env                   # 環境變數
-├── package.json           # 依賴管理
-└── README.md              # 說明文檔
-```
-
-## 🌐 開發環境設定
-
-### 本地測試完整流程
-
-1. **終端 1 - 啟動應用**
-   ```bash
-   cd openai-s2s-example
-   node app.js
-   ```
-
-2. **終端 2 - 啟動 ngrok**
-   ```bash
-   ngrok http 3000
-   ```
-
-3. **配置 jambonz**
-   - 複製 ngrok 提供的 HTTPS URL
-   - 在 jambonz 控制台更新 Webhook URL
-
-4. **測試 SIP 連接**
-   - 打開 Zoiper
-   - 確認 SIP 帳號註冊成功
-   - 撥打測試號碼
-
-### ngrok 進階配置
-
-**自定義域名** (付費版):
-```bash
-ngrok http 3000 --subdomain=my-joke-master
-```
-
-**配置文件** (`~/.ngrok2/ngrok.yml`):
-```yaml
-authtoken: your_ngrok_token_here
-tunnels:
-  joke-master:
-    addr: 3000
-    proto: http
-    subdomain: my-joke-master
-```
-
-## 🔧 開發說明
-
-### 自定義功能
-
-**修改笑話類型**:
-編輯 `lib/routes/openai-s2s.js` 中的 `instructions`
-
-**添加新工具**:
-在 `tools` 陣列中添加新的函數定義
-
-**調整語音設定**:
-修改 `voice`、`temperature` 等參數
-
-### 日誌監控
-
-應用程式提供詳細的日誌輸出：
-- 📞 來電事件
-- 🎤 語音轉錄
-- 🤖 AI 回應
-- ⚠️ 錯誤處理
-
-## 📊 API 使用
-
-### OpenAI API 費用
-- **Realtime API**: 按分鐘計費
-- **Whisper**: 按音頻時長計費
-- **TTS**: 按字符計費
-
-### 監控使用量
-在 OpenAI 控制台監控 API 使用量和費用
-
-## 🤝 貢獻
-
-歡迎提交 issues 和 pull requests！
+## 🧰 程式碼風格（ESLint）
+- 2 空格縮排、單引號、120 字元上限
+- Promise 強制錯誤處理
+- 使用結構化日誌
 
 ## 📄 授權
 
-MIT License - 詳見 LICENSE 文件
-
-## 🎭 關於笑話大師
-
-這個 AI 笑話大師是基於 OpenAI 最新的 Realtime API 技術，結合 jambonz 電話平台，創造出的創新語音娛樂應用。它不僅能提供各種笑話，還能進行自然對話，為用戶帶來歡樂體驗！
-
----
-
-**享受與您的 AI 笑話大師對話的樂趣！** 🎪✨
+MIT License
