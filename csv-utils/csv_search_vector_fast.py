@@ -94,7 +94,7 @@ def search_vector_fast(query, max_results=5):
         # 提取結果
         results = []
         for node in response.source_nodes:
-            metadata = node.metadata
+            metadata = node.node.metadata
             results.append({
                 'id': metadata.get('id', ''),
                 'title_cn': metadata.get('title_cn', ''),
@@ -144,7 +144,7 @@ def search_vector_with_summary(query, max_results=3):
         
         results = []
         for node in response.source_nodes:
-            metadata = node.metadata
+            metadata = node.node.metadata
             results.append({
                 'id': metadata.get('id', ''),
                 'title_cn': metadata.get('title_cn', ''),

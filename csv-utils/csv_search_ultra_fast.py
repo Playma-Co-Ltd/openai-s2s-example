@@ -9,15 +9,20 @@ import json
 import pickle
 import time
 from pathlib import Path
-from llama_index.core import Document, VectorStoreIndex
-from llama_index.embeddings.openai import OpenAIEmbedding
-from llama_index.llms.openai import OpenAI
-from llama_index.core.settings import Settings
+try:
+    from llama_index.core import Document, VectorStoreIndex
+    from llama_index.embeddings.openai import OpenAIEmbedding
+    from llama_index.llms.openai import OpenAI
+    from llama_index.core.settings import Settings
+    HAS_LLAMA = True
+except Exception:
+    Document = VectorStoreIndex = OpenAIEmbedding = OpenAI = Settings = None
+    HAS_LLAMA = False
 
 # 全局緩存變數
 _df_cache = None
 _df_cache_time = 0
-_index_cache = None
+_index_cache = {}
 
 def setup_llama_index():
     """設置 LlamaIndex 使用最快的模型"""
@@ -26,6 +31,8 @@ def setup_llama_index():
         raise ValueError("OPENAI_API_KEY environment variable is required")
     
     # 使用最快的模型組合
+    if not HAS_LLAMA:
+        raise RuntimeError('llama-index not installed. Please install: pip install llama-index openai')
     Settings.llm = OpenAI(model="gpt-4o-mini", api_key=openai_key, temperature=0)
     Settings.embed_model = OpenAIEmbedding(
         model="text-embedding-3-small",
@@ -266,20 +273,27 @@ def create_mini_documents(max_chars=100):
 
 def search_content_mini(query, max_results=3, max_chars=100):
     """極簡內容搜尋 - 犧牲準確度換取速度"""
-    global _index_cache
+    global _index_cache, _df_cache_time
     
     try:
+        if not HAS_LLAMA:
+            return {'error': 'llama-index 未安裝。請先安裝: pip install llama-index openai', 'query': query}
+
+        # 刷新 CSV 快取，取得最新 mtime 以構造快取鍵
+        _ = load_csv_data_cached()
+        cache_key = (max_chars, _df_cache_time)
+
         setup_llama_index()
-        
+         
         # 使用全局快取的索引
-        if _index_cache is None:
+        if cache_key not in _index_cache:
             # print(f"Building mini index (max {max_chars} chars)...", file=sys.stderr)
             documents = create_mini_documents(max_chars)
-            _index_cache = VectorStoreIndex.from_documents(documents)
+            _index_cache[cache_key] = VectorStoreIndex.from_documents(documents)
             # print("Mini index ready", file=sys.stderr)
         
         # 使用最簡單的查詢模式
-        query_engine = _index_cache.as_query_engine(
+        query_engine = _index_cache[cache_key].as_query_engine(
             similarity_top_k=max_results,
             response_mode="no_text"  # 不生成總結，只返回相關文檔
         )
