@@ -97,9 +97,9 @@
   https://<ngrok-id>.ngrok.io/openai-s2s-csv-search
   ```
 - 語音服務（Voice / Speech）：
-  - Speech synthesis vendor（TTS）: OpenAI
+  - Speech synthesis vendor（TTS）: Whisper
     - Voice: shimmer（推薦中文）
-  - Speech recognizer vendor（STT）: Whisper
+  - Speech recognizer vendor（STT）: OpenAI
     - Language: Chinese（中文）
 - 新增 SIP Client（Clients → Add sip client）：
   - User Name：自行設定（例如 `100`）
