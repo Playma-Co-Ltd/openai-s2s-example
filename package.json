@@ -5,6 +5,7 @@
   "main": "app.js",
   "scripts": {
     "start": "node app",
+    "restart": "node restart-app",
     "jslint": "eslint app.js lib --fix"
   },
   "author": "Dave Horton",
@@ -12,6 +13,8 @@
   "dependencies": {
     "@jambonz/node-client-ws": "^0.1.55",
     "axios": "^1.7.7",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
     "pino": "^9.4.0"
   },
   "devDependencies": {
