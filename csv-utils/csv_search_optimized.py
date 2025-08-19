@@ -9,10 +9,15 @@ import pandas as pd
 import json
 import pickle
 from pathlib import Path
-from llama_index.core import Document, VectorStoreIndex
-from llama_index.embeddings.openai import OpenAIEmbedding
-from llama_index.llms.openai import OpenAI
-from llama_index.core.settings import Settings
+try:
+    from llama_index.core import Document, VectorStoreIndex
+    from llama_index.embeddings.openai import OpenAIEmbedding
+    from llama_index.llms.openai import OpenAI
+    from llama_index.core.settings import Settings
+    HAS_LLAMA = True
+except Exception:
+    Document = VectorStoreIndex = OpenAIEmbedding = OpenAI = Settings = None
+    HAS_LLAMA = False
 
 def setup_llama_index():
     """設置 LlamaIndex 使用更快的模型"""
@@ -21,6 +26,8 @@ def setup_llama_index():
         raise ValueError("OPENAI_API_KEY environment variable is required")
     
     # 使用更快的模型
+    if not HAS_LLAMA:
+        raise RuntimeError('llama-index not installed. Please install: pip install llama-index openai')
     Settings.llm = OpenAI(model="gpt-4o-mini", api_key=openai_key)
     Settings.embed_model = OpenAIEmbedding(
         model="text-embedding-3-small",  # 更快的嵌入模型
@@ -245,6 +252,8 @@ def load_or_create_content_index(max_content_chars=300):
 def search_content_detailed(query, max_results=3, max_content_chars=300):
     """詳細內容搜尋 - 使用向量搜尋，可配置內容長度"""
     try:
+        if not HAS_LLAMA:
+            return {'error': 'llama-index 未安裝。請先安裝: pip install llama-index openai', 'query': query}
         setup_llama_index()
         
         # 載入索引
